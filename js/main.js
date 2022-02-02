@@ -1,55 +1,38 @@
 var canvas = document.getElementById('canvas');
 
-canvas.width = window.innerWidth/2 - 70;
-canvas.height = window.innerHeight/2 - 10;
+canvas.width = window.innerWidth / 2 - 70;
+canvas.height = window.innerHeight / 2 - 10;
 
 var c = canvas.getContext('2d');
 
-// Elements
-var mouseposDisplay = document.getElementById("mousepos");
+// DOM elements
+var mousePosDisplay = document.getElementById("mousepos");
 var statusDisplay = document.getElementById("status");
 
-var recordedData = []
-var mousedown = false;
-
-var playInterval = undefined;
-var recordInterval = undefined;
-var frameIndex = 0;
-
-
-var recording = false;
-var playing = false;
-
+// Variables
 var canvasMousepos = [-1, -1];
-var firstPoint = true;
-var lineWidth = 3;
-var color = '000000';
-var canvasData = c.getImageData(0, 0, canvas.width, canvas.height);
-var objectType = 0; // 0 for pen, 1 for highlighter, 2 for eraser.
+var mousedown = false;
+var lastPoint = [-1, -1];
+var paintInterval;
+var recordInterval;
+var frameIndex;
+var recording = false;
+var painting = false;
+var recordedData = []
+var firstPoint = false;
 
-// Convas configuration
-c.lineWidth = lineWidth;
-c.lineCap = 'round';
+// Canvas configuration
+c.lineWidth = 2;
+c.lineCap = "round";
 
-// Set objectType
-function setObjectType(t) {
-    objectType = t;
-}
-
-// Set color
-function setColor(col) {
-    c.strokeStyle = '#' + col;
+function printLastPoint() {
+    console.log(lastPoint);
 }
 
 // Erase the canvas.
 function erase() {
-
-    if (recording == true) {
-        startRec();
-    }
     c.clearRect(0, 0, canvas.width, canvas.height);
 }
-
 
 // Get mouse location on canvas
 function getMousePos(canvas, evt) {
@@ -62,98 +45,110 @@ function getMousePos(canvas, evt) {
 
 // When mouse is hovered over the canvas.
 canvas.addEventListener("mousemove", function (evt) {
-    
+
     var mousePos = getMousePos(canvas, evt);
     canvasMousepos = [mousePos.x, mousePos.y]
-    mouseposDisplay.innerHTML = mousePos.x + ',' + mousePos.y;
-    
-    if (mousedown) {
-        // recordedData.push(canvasMousepos);
-        c.lineTo(canvasMousepos[0], canvasMousepos[1]);
+
+    mousePosDisplay.innerHTML = mousePos.x + ',' + mousePos.y;
+
+    // Save the last point only if 
+    // mousedown.
+    if (mousedown == true) {
+        lastPoint = [mousePos.x, mousePos.y];
+        c.lineTo(lastPoint[0], lastPoint[1])
         c.stroke();
+        // recordedData.push(lastPoint)
+        // printLastPoint()
     }
-    
+
+
 }, false);
 
 // When mouse button is down on canvas.
 canvas.addEventListener("mousedown", function (evt) {
-    mousedown = true;
+    console.log('Mousedown')
 
-    // Use current point.
     var mousePos = getMousePos(canvas, evt);
-    canvasMousepos = [mousePos.x, mousePos.y, 1]
-    // recordedData.push(canvasMousepos)
+    canvasMousepos = [mousePos.x, mousePos.y]
 
-    c.stroke();
+    lastPoint = [mousePos.x, mousePos.y];
+    mousedown = true;
+    firstPoint = true;
+    // recordedData.push(lastPoint)
+    // printLastPoint();
+
     c.beginPath();
+    c.moveTo(mousePos.x, mousePos.y)
 
 }, false);
+
 
 // When pressed mouse button is upped.
 canvas.addEventListener("mouseup", function (evt) {
+    console.log('Mouseup')
     mousedown = false;
-
-    c.stroke();
-    c.beginPath();
 }, false);
 
-// When mouse leaves the canvas.
+// When mouse enters the canvas.
 canvas.addEventListener("mouseenter", function (evt) {
-    // mousedown = false;
-    c.beginPath();
+    console.log('Mouseenter')
 }, false);
 
-
-// When record button is clicked.
 function startRec() {
 
     if (recording == true) {
         recording = false;
         clearInterval(recordInterval);
-        console.log('Recording closed');
+        console.log(recordedData);
+        statusDisplay.innerHTML = '';
     } else {
         recording = true;
         recordInterval = setInterval(record, 33);
-        
+        statusDisplay.innerHTML = 'Recording';
     }
 }
 
 function record() {
-    recordedData.push(canvasMousepos);
-}
-
-function startPlay() {
-
-    if (playing == false) {
-        playing = true;
-        erase();
-        frameIndex = 0;
-        playInterval = setInterval(play, 33)
+    if (firstPoint == true) {
+        recordedData.push([lastPoint[0], lastPoint[1], 1]);
+        firstPoint = false;
     } else {
-        playing = false;
-        clearInterval(playInterval);
-        console.log('Playing closed');
+        recordedData.push(lastPoint);
     }
 
 }
 
-function play() {
+function startPaint() {
+    if (painting == true) {
+        painting = false;
+        clearInterval(paintInterval);
+        statusDisplay.innerHTML = '';
+    } else {
+        erase();
+        painting = true;
+        frameIndex = 0;
+        paintInterval = setInterval(paint, 33)
+        statusDisplay.innerHTML = 'Painting';
+    }
+}
+
+function paint() {
+
     frame = recordedData[frameIndex];
+
     if (frame[0] != -1) {
         if (frame[2] == 1) {
-            c.closePath();
-            console.log('HERE');
-            c.moveTo(frame[0], frame[1])
             c.beginPath()
+            c.moveTo(...frame);
         } else {
-            c.lineTo(frame[0], frame[1]);
+            c.lineTo(...frame);
             c.stroke();
         }
     }
-
+    
     frameIndex++;
-    if(frameIndex == recordedData.length) {
-        startPlay();
-    }
 
+    if (frameIndex == recordedData.length) {
+        clearInterval(paintInterval);
+    }
 }
